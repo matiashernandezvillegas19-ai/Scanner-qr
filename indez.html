@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escáner QR Ruta</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;min-height:100vh;padding:20px;display:flex;justify-content:center;align-items:flex-start}
+    .card{background:white;border-radius:16px;padding:28px;width:100%;max-width:420px;margin-top:20px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+    .logo{font-size:48px;margin-bottom:8px}
+    h1{font-size:20px;color:#1a1a2e;margin-bottom:4px}
+    .sub{font-size:13px;color:#888;margin-bottom:20px}
+    video{width:100%;border-radius:12px;margin-bottom:12px}
+    canvas{display:none}
+    .btn{width:100%;padding:16px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px}
+    .btn-scan{background:#FFE600;color:#1a1a2e}
+    .btn-green{background:#2e7d32;color:#fff}
+    .btn-gray{background:#f0f2f5;color:#1a1a2e}
+    input[type=number]{width:100%;padding:14px;border:2px solid #e0e0e0;border-radius:10px;font-size:22px;text-align:center;font-weight:700;margin-top:8px}
+    input:focus{outline:none;border-color:#FFE600}
+    .banner{padding:14px;border-radius:10px;font-size:15px;font-weight:600;margin:12px 0;text-align:left}
+    .banner-verde{background:#e8f5e9;border-left:4px solid #2e7d32;color:#2e7d32}
+    .banner-azul{background:#e3f2fd;border-left:4px solid #1565c0;color:#1565c0;text-align:center}
+    label{display:block;font-size:14px;font-weight:600;color:#333;margin-top:12px;margin-bottom:4px;text-align:left}
+    .scanning-msg{font-size:13px;color:#888;margin-top:8px}
+    #video-wrap{display:none}
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- PASO 1: ESCANEAR -->
+  <div id="paso1">
+    <div class="logo">📷</div>
+    <h1>Escáner QR Ruta</h1>
+    <p class="sub">Escanea el QR de la ruta para identificarla</p>
+    <div id="video-wrap">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="canvas"></canvas>
+      <p class="scanning-msg">🔍 Apunta la cámara al QR de la ruta...</p>
+    </div>
+    <button class="btn btn-scan" id="btn-camara" onclick="abrirCamara()">📷 Abrir cámara</button>
+  </div>
+
+  <!-- PASO 2: RUTA IDENTIFICADA -->
+  <div id="paso2" style="display:none">
+    <div class="logo">📦</div>
+    <h1>Ruta identificada</h1>
+    <div class="banner banner-verde" id="banner-ruta"></div>
+    <label>N° de estacionamiento</label>
+    <input type="number" id="estac" placeholder="Ej: 5" min="1"/>
+    <button class="btn btn-green" id="btn-confirmar" onclick="confirmar()" style="margin-top:12px">✓ Confirmar asignación</button>
+    <button class="btn btn-gray" onclick="reiniciar()" style="margin-top:8px">← Escanear otro</button>
+  </div>
+
+  <!-- PASO 3: CONFIRMADO -->
+  <div id="paso3" style="display:none">
+    <div class="logo">✅</div>
+    <h1>¡Asignación guardada!</h1>
+    <div class="banner banner-azul" id="banner-ok"></div>
+    <button class="btn btn-scan" onclick="reiniciar()" style="margin-top:16px">← Escanear otra ruta</button>
+  </div>
+
+</div>
+
+<script>
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxGF_2MUlUGNs3AziZ7ao4zDFO1M5p82oB_c8y_KYWr_j5cMR2IR6NhiJntGUU3AUaFUg/exec";
+  var rutaActual = "";
+  var stream     = null;
+  var scanLoop   = null;
+
+  function abrirCamara() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Tu navegador no soporta cámara. Usa Chrome o Safari actualizado.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+      .then(function(s) {
+        stream = s;
+        var video = document.getElementById('video');
+        video.srcObject = stream;
+        video.play();
+        document.getElementById('video-wrap').style.display = 'block';
+        document.getElementById('btn-camara').style.display = 'none';
+        scanLoop = setInterval(escanear, 300);
+      })
+      .catch(function(err) {
+        alert('No se pudo acceder a la cámara: ' + err.message);
+      });
+  }
+
+  function escanear() {
+    var video  = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    var img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+    if (code) {
+      clearInterval(scanLoop);
+      detenerCamara();
+      procesarQR(code.data);
+    }
+  }
+
+  function procesarQR(texto) {
+    try {
+      var data = JSON.parse(texto);
+      if (data.assignment) {
+        rutaActual = data.assignment;
+        document.getElementById('banner-ruta').textContent = '🗺️ Ruta: ' + rutaActual;
+        document.getElementById('paso1').style.display = 'none';
+        document.getElementById('paso2').style.display = 'block';
+      } else {
+        alert('QR sin campo assignment. Intentá de nuevo.');
+        reiniciar();
+      }
+    } catch(e) {
+      alert('QR no reconocido. Escanea el QR de una ruta.');
+      reiniciar();
+    }
+  }
+
+  function detenerCamara() {
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    document.getElementById('video-wrap').style.display = 'none';
+  }
+
+  function confirmar() {
+    var estac = document.getElementById('estac').value.trim();
+    if (!estac) { alert('Ingresá el número de estacionamiento'); return; }
+
+    var btn = document.getElementById('btn-confirmar');
+    btn.disabled    = true;
+    btn.textContent = '⏳ Guardando...';
+
+    fetch(APPS_SCRIPT_URL + '?accion=guardar&ruta=' + encodeURIComponent(rutaActual) + '&estac=' + encodeURIComponent(estac))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          document.getElementById('banner-ok').textContent = '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
+          document.getElementById('paso2').style.display = 'none';
+          document.getElementById('paso3').style.display = 'block';
+        } else {
+          alert('Error al guardar. Intentá de nuevo.');
+          btn.disabled    = false;
+          btn.textContent = '✓ Confirmar asignación';
+        }
+      })
+      .catch(function() {
+        alert('Error de conexión. Intentá de nuevo.');
+        btn.disabled    = false;
+        btn.textContent = '✓ Confirmar asignación';
+      });
+  }
+
+  function reiniciar() {
+    detenerCamara();
+    rutaActual = '';
+    clearInterval(scanLoop);
+    document.getElementById('estac').value             = '';
+    document.getElementById('btn-camara').style.display = 'block';
+    document.getElementById('paso1').style.display     = 'block';
+    document.getElementById('paso2').style.display     = 'none';
+    document.getElementById('paso3').style.display     = 'none';
+    var btn = document.getElementById('btn-confirmar');
+    btn.disabled    = false;
+    btn.textContent = '✓ Confirmar asignación';
+  }
+</script>
+</body>
+</html>
