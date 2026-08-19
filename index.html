@@ -144,16 +144,22 @@
       '&ruta='  + encodeURIComponent(rutaActual) +
       '&estac=' + encodeURIComponent(estac);
 
-    fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow' })
-      .finally(function() {
-        // Esperamos 2 segundos para que Apps Script procese
-        setTimeout(function() {
-          document.getElementById('banner-ok').textContent =
-            '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
-          document.getElementById('paso2').style.display = 'none';
-          document.getElementById('paso3').style.display = 'block';
-        }, 2000);
-      });
+    // Truco img para evitar CORS
+    var img = new Image();
+    img.onload  = function() { mostrarExito(estac); };
+    img.onerror = function() { mostrarExito(estac); };
+    img.src = url;
+
+    // Timeout de seguridad
+    setTimeout(function() { mostrarExito(estac); }, 3000);
+  }
+
+  function mostrarExito(estac) {
+    if (document.getElementById('paso3').style.display === 'block') return;
+    document.getElementById('banner-ok').textContent =
+      '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
+    document.getElementById('paso2').style.display = 'none';
+    document.getElementById('paso3').style.display = 'block';
   }
   function mostrarExito(estac) {
     document.getElementById('banner-ok').textContent =
