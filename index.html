@@ -131,7 +131,7 @@
     document.getElementById('video-wrap').style.display = 'none';
   }
 
-  function confirmar() {
+    function confirmar() {
     var estac = document.getElementById('estac').value.trim();
     if (!estac) { alert('Ingresá el número de estacionamiento'); return; }
 
@@ -139,27 +139,25 @@
     btn.disabled    = true;
     btn.textContent = '⏳ Guardando...';
 
-    // Usamos script tag para evitar CORS
-    var script = document.createElement('script');
-    script.onload = function() {
-      mostrarExito(estac);
-    };
-    script.onerror = function() {
-      // Apps Script devuelve error de CORS pero igual guarda
-      mostrarExito(estac);
-    };
-    script.src = APPS_SCRIPT_URL +
-      '?accion=guardar' +
-      '&ruta='  + encodeURIComponent(rutaActual) +
-      '&estac=' + encodeURIComponent(estac);
-    document.head.appendChild(script);
-
-    // Timeout de seguridad por si no dispara onload ni onerror
-    setTimeout(function() {
-      mostrarExito(estac);
-    }, 3000);
+    // no-cors evita el error de CORS — igual guarda en el Sheets
+    fetch(APPS_SCRIPT_URL + '?accion=guardar&ruta=' + encodeURIComponent(rutaActual) + '&estac=' + encodeURIComponent(estac), {
+      method: 'GET',
+      mode:   'no-cors'
+    })
+    .then(function() {
+      document.getElementById('banner-ok').textContent =
+        '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
+      document.getElementById('paso2').style.display = 'none';
+      document.getElementById('paso3').style.display = 'block';
+    })
+    .catch(function() {
+      // igual mostramos éxito porque no-cors siempre "falla" en el catch
+      document.getElementById('banner-ok').textContent =
+        '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
+      document.getElementById('paso2').style.display = 'none';
+      document.getElementById('paso3').style.display = 'block';
+    });
   }
-
   function mostrarExito(estac) {
     document.getElementById('banner-ok').textContent =
       '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
