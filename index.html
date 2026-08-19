@@ -131,7 +131,7 @@
     document.getElementById('video-wrap').style.display = 'none';
   }
 
-    function confirmar() {
+     function confirmar() {
     var estac = document.getElementById('estac').value.trim();
     if (!estac) { alert('Ingresá el número de estacionamiento'); return; }
 
@@ -139,24 +139,21 @@
     btn.disabled    = true;
     btn.textContent = '⏳ Guardando...';
 
-    // no-cors evita el error de CORS — igual guarda en el Sheets
-    fetch(APPS_SCRIPT_URL + '?accion=guardar&ruta=' + encodeURIComponent(rutaActual) + '&estac=' + encodeURIComponent(estac), {
-      method: 'GET',
-      mode:   'no-cors'
-    })
-    .then(function() {
-      document.getElementById('banner-ok').textContent =
-        '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
-      document.getElementById('paso2').style.display = 'none';
-      document.getElementById('paso3').style.display = 'block';
-    })
-    .catch(function() {
-      // igual mostramos éxito porque no-cors siempre "falla" en el catch
-      document.getElementById('banner-ok').textContent =
-        '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
-      document.getElementById('paso2').style.display = 'none';
-      document.getElementById('paso3').style.display = 'block';
-    });
+    var url = APPS_SCRIPT_URL + 
+      '?accion=guardar' +
+      '&ruta='  + encodeURIComponent(rutaActual) +
+      '&estac=' + encodeURIComponent(estac);
+
+    fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow' })
+      .finally(function() {
+        // Esperamos 2 segundos para que Apps Script procese
+        setTimeout(function() {
+          document.getElementById('banner-ok').textContent =
+            '🗺️ Ruta ' + rutaActual + ' → 🅿️ Estacionamiento ' + estac;
+          document.getElementById('paso2').style.display = 'none';
+          document.getElementById('paso3').style.display = 'block';
+        }, 2000);
+      });
   }
   function mostrarExito(estac) {
     document.getElementById('banner-ok').textContent =
